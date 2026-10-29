@@ -1,1 +1,148 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101827">
+<title>Philippine News Watch</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101827;color:#f3f6fc;
+font:16px system-ui,sans-serif}
+header{padding:24px 18px;background:#19263a}
+h1{font-size:25px;margin:0 0 7px}
+p{color:#b8c5d8;line-height:1.5}
+main{max-width:720px;margin:auto;padding:16px}
+button{background:#263953;color:white;border:1px solid #425573;
+border-radius:10px;padding:11px;margin:3px;cursor:pointer}
+button:focus{outline:2px solid #8ab4ff}
+.active{background:#b9d4ff;color:#102039}
+#status{font-size:14px}
+.story{background:#19263a;padding:16px;border-radius:14px;
+margin:12px 0}
+.story h2{font-size:18px;line-height:1.4;margin:7px 0}
+.story a{color:#a9ceff}
+.small{font-size:13px;color:#b8c5d8}
+.ask{display:inline-block;margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🇵🇭 Philippine News Watch</h1>
+  <p>Important developments. Clear context. Informed citizens.</p>
+</header>
+<main>
+  <div id="tabs">
+    <button class="active" data-topic="government">Government</button>
+    <button data-topic="economy">Economy</button>
+    <button data-topic="mindanao">Mindanao</button>
+  </div>
+  <button id="refresh">↻ Refresh headlines</button>
+  <p id="status">Choose a topic to load the latest headlines.</p>
+  <section id="stories"></section>
+  <p class="small">Headlines are from Google News RSS.
+  Open the original article to check its reporting and context.</p>
+</main>
+<script>
+const topics = {
+  government: "Philippines government laws politics",
+  economy: "Philippines economy prices jobs public services",
+  mindanao: "Mindanao Philippines local government news"
+};
+
+let current = "government";
+const statusBox = document.getElementById("status");
+const storiesBox = document.getElementById("stories");
+
+function safeText(node, selector) {
+  return node.querySelector(selector)?.textContent?.trim() || "";
+}
+
+async function loadNews() {
+  storiesBox.replaceChildren();
+  statusBox.textContent = "Loading headlines…";
+
+  const feed = "https://news.google.com/rss/search?q="
+    + encodeURIComponent(topics[current])
+    + "&hl=en-PH&gl=PH&ceid=PH:en";
+
+  try {
+    const proxy = "https://api.allorigins.win/raw?url="
+      + encodeURIComponent(feed);
+    const response = await fetch(proxy);
+    if (!response.ok) throw new Error("Feed unavailable");
+
+    const xml = new DOMParser().parseFromString(
+      await response.text(), "text/xml"
+    );
+    if (xml.querySelector("parsererror")) {
+      throw new Error("Could not read feed");
+    }
+
+    const items = [...xml.querySelectorAll("item")].slice(0, 20);
+    if (!items.length) throw new Error("No headlines found");
+
+    statusBox.textContent =
+      "Showing " + items.length + " headlines. Check publication dates.";
+
+    for (const item of items) {
+      const title = safeText(item, "title");
+      const link = safeText(item, "link");
+      const date = safeText(item, "pubDate");
+      const source = safeText(item, "source") || "Google News";
+
+      if (!title || !link || !link.startsWith("https://")) continue;
+
+      const card = document.createElement("article");
+      card.className = "story";
+
+      const publisher = document.createElement("div");
+      publisher.className = "small";
+      publisher.textContent = source + (date ? " · " + date : "");
+
+      const heading = document.createElement("h2");
+      const articleLink = document.createElement("a");
+      articleLink.href = link;
+      articleLink.target = "_blank";
+      articleLink.rel = "noopener noreferrer";
+      articleLink.textContent = title;
+      heading.append(articleLink);
+
+      const ask = document.createElement("a");
+      ask.className = "ask";
+      ask.textContent = "Ask ChatGPT about this story ↗";
+      ask.href = "https://chatgpt.com/?q=" + encodeURIComponent(
+        "Explain this Philippine news story in simple terms. "
+        + "Why does it matter to ordinary Filipinos? "
+        + "Separate confirmed facts from uncertainty and use "
+        + "reliable sources. Headline: " + title + " Article: " + link
+      );
+      ask.target = "_blank";
+      ask.rel = "noopener noreferrer";
+
+      card.append(publisher, heading, ask);
+      storiesBox.append(card);
+    }
+  } catch (error) {
+    statusBox.textContent =
+      "Could not load headlines. Check your internet and try Refresh.";
+  }
+}
+
+document.querySelectorAll("[data-topic]").forEach(button => {
+  button.addEventListener("click", () => {
+    current = button.dataset.topic;
+    document.querySelectorAll("[data-topic]").forEach(b =>
+      b.classList.toggle("active", b === button)
+    );
+    loadNews();
+  });
+});
+
+document.getElementById("refresh").addEventListener("click", loadNews);
+loadNews();
+</script>
+</body>
+</html>
+
